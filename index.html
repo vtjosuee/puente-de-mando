@@ -1937,7 +1937,8 @@ async function pullCloud(){
 async function boot(){
   readUI();
   // si la ultima vez que se uso fue otro dia, se arranca en hoy
-  if(!UI.day || (UI.savedOn && UI.savedOn !== todayStr())){
+  // sin savedOn (primera vez tras actualizar) tambien se arranca en hoy
+  if(!UI.day || UI.savedOn !== todayStr()){
     UI.day = todayStr(); UI.month = UI.day.slice(0,7);
   }
   if(!UI.month) UI.month=UI.day.slice(0,7);
