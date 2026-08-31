@@ -469,7 +469,7 @@ function migrate(o){
 function readLocal(){ try{ const r=localStorage.getItem(LS); return r?migrate(JSON.parse(r)):null; }catch(e){ return null; } }
 function writeLocal(){ try{ localStorage.setItem(LS, JSON.stringify(S)); }catch(e){} }
 function readUI(){ try{ const r=localStorage.getItem(LSUI); if(r) Object.assign(UI,JSON.parse(r)); }catch(e){} }
-function writeUI(){ try{ localStorage.setItem(LSUI, JSON.stringify(UI)); }catch(e){} }
+function writeUI(){ try{ UI.savedOn = todayStr(); localStorage.setItem(LSUI, JSON.stringify(UI)); }catch(e){} }
 
 function save(rerender){
   S.updatedAt = new Date().toISOString();
@@ -716,11 +716,17 @@ function chargesInRange(fromStr,toStr,kind){
 }
 function monthRange(ms){ const y=+ms.slice(0,4), m=+ms.slice(5,7)-1; return [ymd(new Date(y,m,1)), ymd(new Date(y,m+1,0))]; }
 function monthTotals(ms){
-  const r = monthRange(ms);
-  const inc = chargesInRange(r[0],r[1],"in").reduce((s,c)=>s+c.amount,0);
+  const r = monthRange(ms), hoy = todayStr();
+  const incAll = chargesInRange(r[0],r[1],"in");
   const exp = chargesInRange(r[0],r[1],"out");
-  return { inc, exp: exp.reduce((s,c)=>s+c.amount,0),
-           paid: exp.filter(c=>c.paid).reduce((s,c)=>s+c.amount,0), charges:exp };
+  return {
+    inc: incAll.reduce((s,c)=>s+c.amount,0),
+    exp: exp.reduce((s,c)=>s+c.amount,0),
+    // ya salido: todo lo que tiene fecha de hoy o anterior. Automatico, sin marcar nada.
+    charged: exp.filter(c=>c.date<=hoy).reduce((s,c)=>s+c.amount,0),
+    incomed: incAll.filter(c=>c.date<=hoy).reduce((s,c)=>s+c.amount,0),
+    charges: exp
+  };
 }
 function spentByBucket(ms){
   const r=monthRange(ms), map={};
@@ -1150,11 +1156,14 @@ function viewDinero(){
     '<button class="btn" data-add="income">'+svg(I.plus)+"Ingreso</button>"+
     '<button class="btn pri" data-add="expense">'+svg(I.plus)+"Gasto</button></div>");
 
+  const esMesActual = (ms === todayStr().slice(0,7));
   const stats='<div class="stats">'+
-    '<div class="stat"><div class="k">Ingresos</div><div class="v" style="color:var(--ok)">'+fmtMoney0(T.inc)+'</div><div class="s">previstos este mes</div></div>'+
+    '<div class="stat"><div class="k">Ingresos</div><div class="v" style="color:var(--ok)">'+fmtMoney0(T.inc)+'</div><div class="s">'+
+      (esMesActual && T.incomed < T.inc ? "cobrados "+fmtMoney0(T.incomed) : "previstos este mes")+"</div></div>"+
     '<div class="stat"><div class="k">Comprometido</div><div class="v">'+fmtMoney0(T.exp)+'</div><div class="s">'+T.charges.length+" cargos</div></div>"+
     '<div class="stat"><div class="k">Libre</div><div class="v" style="color:'+(free<0?"var(--crit)":"var(--ink)")+'">'+fmtMoney0(free)+'</div><div class="s">'+(T.inc?Math.round(free/T.inc*100):0)+"% del ingreso</div></div>"+
-    '<div class="stat"><div class="k">Ya pagado</div><div class="v">'+fmtMoney0(T.paid)+'</div><div class="s">quedan '+fmtMoney0(T.exp-T.paid)+"</div></div>"+
+    '<div class="stat"><div class="k">Ya cargado</div><div class="v">'+fmtMoney0(T.charged)+'</div><div class="s">'+
+      (T.exp-T.charged>0 ? "faltan "+fmtMoney0(T.exp-T.charged) : "todo el mes cubierto")+"</div></div>"+
   "</div>";
 
   /* distribución */
@@ -1185,17 +1194,18 @@ function viewDinero(){
     "<th>Concepto</th><th>Sobre</th><th>Frecuencia</th><th>Próximo</th><th class='num'>Importe</th><th></th></tr></thead><tbody>"+
     rows.map(it=>{
       const nx=nextOf(it), b=bucketById(it.bucketId);
-      const rest = it.freq==="cuotas"? (Math.max(0,(+it.count||1)-(it.paid||[]).length)) : null;
-      const isPaidThis = (it.paid||[]).some(p=>p>=r[0]&&p<=r[1]);
       const occThis = occurrences(it,r[0],r[1]);
-      return '<tr'+(isPaidThis&&occThis.length?' class="paid"':"")+' data-exp="'+esc(it.id)+'">'+
+      const yaCargado = occThis.some(d=>d<=todayStr());
+      const pagadas = it.freq==="cuotas"? occurrences(it,"1970-01-01",todayStr()).length : 0;
+      const rest = it.freq==="cuotas"? Math.max(0,(+it.count||1)-pagadas) : null;
+      return '<tr'+(yaCargado?' class="paid"':"")+' data-exp="'+esc(it.id)+'">'+
         '<td class="c-nom"><b>'+esc(it.name)+"</b>"+(rest!=null?'<div class="dim mono" style="font-size:11.5px">'+((+it.count||1)-rest)+"/"+(+it.count||1)+" cuotas · restan "+fmtMoney0(rest*(+it.amount||0))+"</div>":"")+"</td>"+
         '<td class="c-sobre">'+(b?'<span class="chip"><i class="dot" style="background:var('+b.color+')"></i>'+esc(b.name)+"</span>":'<span class="dim">—</span>')+"</td>"+
         '<td class="dim c-freq" style="font-size:12.5px">'+esc(freqTxt(it))+"</td>"+
-        '<td class="num c-next'+(nx&&nx<=ymd(addDays(new Date(),7))?'" style="color:var(--warn)"':'"')+'>'+(nx?esc(fmtDate(nx)):'<span class="dim">—</span>')+"</td>"+
+        '<td class="num c-next'+(!yaCargado&&nx&&nx<=ymd(addDays(new Date(),7))?'" style="color:var(--warn)"':'"')+'>'+
+          (yaCargado?'<span class="chip" style="color:var(--ok)">cargado</span>':(nx?esc(fmtDate(nx)):'<span class="dim">—</span>'))+"</td>"+
         '<td class="num c-imp"><b>'+fmtMoney(it.amount)+"</b></td>"+
-        '<td class="act c-act">'+(occThis.length?'<button class="iconbtn" data-act="paytoggle" data-d="'+occThis[0]+'" data-tip="'+(isPaidThis?"Marcar como no pagado":"Marcar como pagado")+'" style="'+(isPaidThis?"color:var(--ok)":"")+'">'+svg(I.check)+"</button>":"")+
-        '<button class="iconbtn" data-act="expedit" data-tip="Editar">'+svg(I.pen)+"</button></td></tr>";
+        '<td class="act c-act"><button class="iconbtn" data-act="expedit" data-tip="Editar">'+svg(I.pen)+"</button></td></tr>";
     }).join("")+"</tbody></table></div>"
     : '<div class="empty"><b>Sin gastos registrados</b>Añade tus suscripciones, recibos fijos y deudas puntuales.</div>';
 
@@ -1347,7 +1357,7 @@ function viewBalance(){
     '<div class="legend"><span><i style="background:var(--c8)"></i>Ingresos</span><span><i style="background:var(--c4)"></i>Gastos</span></div>';
 
   /* próximos vencimientos */
-  const soon=chargesInRange(todayStr(),ymd(addDays(new Date(),30)),"out").filter(c=>!c.paid).slice(0,10);
+  const soon=chargesInRange(ymd(addDays(new Date(),1)),ymd(addDays(new Date(),30)),"out").slice(0,10);
   const soonHTML=soon.length?'<table class="t"><tbody>'+soon.map(c=>
     '<tr><td class="mono dim" style="width:1%;white-space:nowrap">'+esc(fmtDate(c.date))+"</td><td>"+esc(c.item.name)+"</td>"+
     '<td class="num"><b>'+fmtMoney(c.amount)+"</b></td></tr>").join("")+"</tbody></table>"
@@ -1842,9 +1852,6 @@ document.addEventListener("click",e=>{
   const xp=t.closest("[data-exp]");
   if(xp){
     const it=S.money.expenses.find(x=>x.id===xp.getAttribute("data-exp")); if(!it) return;
-    const pay=t.closest('[data-act="paytoggle"]');
-    if(pay){ const d=pay.getAttribute("data-d"); it.paid=it.paid||[];
-      const i=it.paid.indexOf(d); i>=0? it.paid.splice(i,1) : it.paid.push(d); save(); return; }
     if(t.closest('[data-act="expedit"]')){ editMoney("expense",it); return; }
   }
   /* bloque del timeline */
@@ -1888,11 +1895,51 @@ function startTick(){
 }
 
 /* =================================================================
+   AL VOLVER A LA APP
+   Safari en iOS congela la pagina: al volver no se recarga y los
+   temporizadores no han corrido. Hay que comprobar la fecha a mano.
+   ================================================================= */
+let diaVisto = todayStr();
+let ultimoPull = 0;
+
+function alVolver(silencioso){
+  const hoy = todayStr();
+  const cambioDeDia = (hoy !== diaVisto);
+  if(cambioDeDia){
+    const estabaEnHoy = (UI.day === diaVisto);
+    diaVisto = hoy;
+    if(estabaEnHoy){ UI.day = hoy; UI.month = hoy.slice(0,7); }
+  }
+  if(document.querySelector(".scrim")) return;   // no interrumpir un formulario abierto
+  if(cambioDeDia){ render(); if(!silencioso) toast("Nuevo día: " + fmtDate(hoy,true) + "."); }
+  if(!silencioso) pullCloud();
+}
+
+/* trae lo que se haya guardado desde el otro dispositivo */
+async function pullCloud(){
+  if(!cloud || syncing || dirty) return;        // nunca pisar cambios locales sin subir
+  if(Date.now() - ultimoPull < 20000) return;   // como mucho una consulta cada 20 s
+  ultimoPull = Date.now();
+  try{
+    const remote = await fetchCloudState();
+    if(!remote) return;
+    if((remote.updatedAt||"") > (S.updatedAt||"")){
+      S = migrate(remote); writeLocal(); applyTheme();
+      if(!document.querySelector(".scrim")) render();
+      toast("Actualizado desde el otro dispositivo.");
+    }
+  }catch(e){}
+}
+
+/* =================================================================
    ARRANQUE
    ================================================================= */
 async function boot(){
   readUI();
-  if(!UI.day) UI.day=todayStr();
+  // si la ultima vez que se uso fue otro dia, se arranca en hoy
+  if(!UI.day || (UI.savedOn && UI.savedOn !== todayStr())){
+    UI.day = todayStr(); UI.month = UI.day.slice(0,7);
+  }
   if(!UI.month) UI.month=UI.day.slice(0,7);
   const local=readLocal();
   S = local || defaultState();
@@ -1913,18 +1960,15 @@ async function boot(){
   setSync(cloud ? (dirty?"dirty":"ok") : "local");
   if(cloud && dirty) pushCloud(true);
   if(S.timer) startTick();
+  diaVisto = todayStr();
 
-  /* si pasa la medianoche con el panel abierto, saltar al nuevo día */
-  let seen = todayStr();
-  setInterval(()=>{
-    const t = todayStr();
-    if(t===seen) return;
-    const wasOnOldToday = (UI.day===seen);
-    seen = t;
-    if(document.querySelector(".scrim")) return;
-    if(wasOnOldToday){ UI.day=t; UI.month=t.slice(0,7); }
-    render();
-  },60000);
+  /* la app vuelve a primer plano o pasa la medianoche */
+  window.addEventListener("visibilitychange",()=>{ if(!document.hidden) alVolver(); });
+  document.addEventListener("visibilitychange",()=>{ if(!document.hidden) alVolver(); });
+  window.addEventListener("pageshow",alVolver);      // tambien al salir de la cache de Safari
+  window.addEventListener("focus",()=>alVolver(true));
+  window.addEventListener("online",()=>alVolver(true));
+  setInterval(()=>alVolver(true), 30000);
   window.addEventListener("beforeunload",()=>{ if(dirty) writeLocal(); });
 }
 boot();
