@@ -1398,9 +1398,8 @@ function viewAjustes(){
     "</div></div>"+
 
     '<div class="panel"><div class="panel-h"><span class="eyebrow">Datos</span></div><div class="panel-b">'+
-      '<p class="muted" style="margin:0 0 12px;font-size:13.5px">Tus datos viven en este dispositivo y, si la nube está disponible, también en el propio panel — así los ves igual en el ordenador y en el móvil.</p>'+
+      '<p class="muted" style="margin:0 0 12px;font-size:13.5px">Copia de seguridad manual, por si quieres guardarlos aparte o llevártelos a otro sitio.</p>'+
       '<div class="wrap">'+
-        '<button class="btn" id="d_sync">'+svg(I.sync)+"Sincronizar ahora</button>"+
         '<button class="btn" id="d_exp">'+svg(I.dl)+"Exportar copia (JSON)</button>"+
         '<button class="btn" id="d_imp">'+svg(I.ul)+"Importar copia</button>"+
         '<button class="btn danger" id="d_wipe">'+svg(I.trash)+"Borrar todo</button>"+
@@ -1428,7 +1427,6 @@ function viewAjustes(){
   if($("#gh_out")) $("#gh_out").addEventListener("click",()=>confirmBox("Desconectar GitHub",
     "Se borra el token de este dispositivo. Tus datos siguen aquí y el gist no se toca.",
     ()=>{ GH.set("token",""); GH.set("user",""); GH.set("gist",""); cloud=null; setSync("local"); render(); },"Desconectar"));
-  $("#d_sync").addEventListener("click",()=>{ dirty=true; pushCloud(); });
   $("#d_exp").addEventListener("click",exportJSON);
   $("#d_imp").addEventListener("click",importJSON);
   $("#d_wipe").addEventListener("click",()=>confirmBox("Borrar todo",
