@@ -806,16 +806,17 @@ function openForm(opts){
     form.innerHTML = (opts.fields||[]).filter(f=>!f.showIf||f.showIf(vals)).map(fieldHTML).join("");
   }
   draw();
+  const hayCondicionales = (opts.fields||[]).some(f=>f.showIf);
   form.addEventListener("input",e=>{
     const k=e.target.getAttribute("data-k"); if(!k) return;
+    // solo se apunta el valor: nada de rehacer el formulario mientras se teclea
     vals[k] = e.target.type==="checkbox"? e.target.checked : e.target.value;
-    if((opts.fields||[]).some(f=>f.showIf)) { const a=document.activeElement, id=a&&a.id, ss=a&&a.selectionStart; draw();
-      if(id){ const n=$("#"+id,form); if(n){ n.focus(); try{ n.selectionStart=n.selectionEnd=ss; }catch(_){} } } }
   });
   form.addEventListener("change",e=>{
     const k=e.target.getAttribute("data-k"); if(!k) return;
     vals[k] = e.target.type==="checkbox"? e.target.checked : e.target.value;
-    if((opts.fields||[]).some(f=>f.showIf)) draw();
+    // un desplegable puede hacer aparecer o desaparecer campos; un texto no
+    if(hayCondicionales && (e.target.tagName==="SELECT" || e.target.type==="checkbox")) draw();
   });
   form.addEventListener("click",e=>{
     const sw=e.target.closest(".swatches button");
@@ -851,8 +852,12 @@ const VIEWS = [
   {k:"balance", t:"Balance", i:I.balance},
   {k:"ajustes", t:"Ajustes", i:I.ajustes}
 ];
+let vistaPrevia = null;
 function render(){
   writeUI();
+  const scrollY = window.scrollY || window.pageYOffset || 0;
+  const mismaVista = (vistaPrevia === UI.view);
+  vistaPrevia = UI.view;
   const od = overdueTasks().length;
   $("#nav").innerHTML = VIEWS.map(v=>
     '<button type="button" data-go="'+v.k+'" aria-current="'+(UI.view===v.k)+'">'+svg(v.i)+"<span>"+v.t+"</span>"+
@@ -861,6 +866,16 @@ function render(){
   $("#brandsub").textContent = sub;
   const V = {hoy:viewHoy, agenda:viewAgenda, dinero:viewDinero, balance:viewBalance, ajustes:viewAjustes}[UI.view] || viewHoy;
   V();
+  // vaciar #view resetea el scroll: se devuelve donde estaba.
+  // Hay que forzar el recalculo del alto antes, o el navegador lo recorta a 0.
+  if(mismaVista){
+    const volver = ()=>{ if(Math.abs((window.scrollY||0) - scrollY) > 1) window.scrollTo(0, scrollY); };
+    void document.documentElement.scrollHeight;
+    volver();
+    requestAnimationFrame(volver);
+  } else {
+    window.scrollTo(0, 0);
+  }
 }
 function topbar(title, right){
   $("#topbar").innerHTML = "<h1>"+esc(title)+'</h1><span class="grow"></span>'+(right||"")+
@@ -1068,7 +1083,6 @@ function viewAgenda(){
 
   const body = UI.calMode==="mes"? monthGrid(y,m) : weekGrid();
   const sel = UI.day;
-  const selTasks = sortTasks(tasksForDate(sel)), selEv = eventsForDate(sel), selCh = chargesInRange(sel,sel);
 
   $("#view").innerHTML =
     '<div class="grid cols2">'+
@@ -1080,27 +1094,46 @@ function viewAgenda(){
           '<div class="wrap"><button class="btn sm" data-ics="imp">'+svg(I.ul)+"Importar .ics</button>"+
           '<button class="btn sm" data-ics="exp">'+svg(I.dl)+"Exportar .ics</button></div>"+
         "</div></div>"+
-      '<div class="panel">'+
-        '<div class="panel-h"><div><span class="eyebrow">'+(relDay(sel)||"Día seleccionado")+'</span>'+
-          '<div style="font-family:var(--f-display);font-weight:700;font-size:15px">'+esc(fmtDate(sel,true))+"</div></div>"+
-          '<button class="btn sm" data-add="task">'+svg(I.plus)+"Tarea</button></div>"+
-        '<div class="panel-b tlwrap" style="overflow-x:hidden">'+renderTimeline(sel,46)+"</div>"+
-        (selEv.length?'<div class="grouphead"><span class="eyebrow">Eventos</span></div><div class="panel-b flush">'+
-          '<table class="t"><tbody>'+selEv.map(e=>
-            '<tr data-ev="'+esc(e.id)+'"><td style="width:1%"><i class="dot" style="background:'+areaColor(e.areaId)+'"></i></td>'+
-            '<td>'+esc(e.title)+(e.location?'<div class="dim" style="font-size:12px">'+esc(e.location)+"</div>":"")+"</td>"+
-            '<td class="num">'+(e.start?esc(e.start)+(e.end?"–"+esc(e.end):""):"todo el día")+"</td>"+
-            '<td class="act"><button class="iconbtn" data-act="evedit" data-tip="Editar">'+svg(I.pen)+"</button></td></tr>").join("")+
-          "</tbody></table></div>":"")+
-        '<div class="grouphead"><span class="eyebrow">Tareas</span><span class="chip">'+selTasks.length+"</span></div>"+
-        '<div class="panel-b flush tlist">'+(selTasks.length? selTasks.map(taskRow).join("")
-          : '<div class="empty">Sin tareas este día.</div>')+"</div>"+
-        (selCh.length?'<div class="grouphead"><span class="eyebrow">Movimientos</span></div><div class="panel-b flush">'+
-          '<table class="t"><tbody>'+selCh.map(c=>'<tr><td>'+esc(c.item.name)+'</td><td class="num" style="color:'+(c.kind==="in"?"var(--ok)":"var(--ink)")+'">'+
-          (c.kind==="in"?"+":"−")+fmtMoney(c.amount)+"</td></tr>").join("")+"</tbody></table></div>":"")+
-      "</div>"+
+      '<div class="panel" id="agenda-detalle">'+agendaDetalle(sel)+"</div>"+
     "</div>";
   scrollTimelines();
+}
+
+/* El detalle del dia seleccionado. Separado para poder refrescar solo esta
+   parte al tocar una celda, sin rehacer el calendario entero. */
+function agendaDetalle(sel){
+  const selTasks = sortTasks(tasksForDate(sel)), selEv = eventsForDate(sel), selCh = chargesInRange(sel,sel);
+  return '<div class="panel-h"><div><span class="eyebrow">'+(relDay(sel)||"Día seleccionado")+'</span>'+
+      '<div style="font-family:var(--f-display);font-weight:700;font-size:15px">'+esc(fmtDate(sel,true))+"</div></div>"+
+      '<button class="btn sm" data-add="task">'+svg(I.plus)+"Tarea</button></div>"+
+    '<div class="panel-b tlwrap" style="overflow-x:hidden">'+renderTimeline(sel,46)+"</div>"+
+    (selEv.length?'<div class="grouphead"><span class="eyebrow">Eventos</span></div><div class="panel-b flush">'+
+      '<table class="t"><tbody>'+selEv.map(e=>
+        '<tr data-ev="'+esc(e.id)+'"><td style="width:1%"><i class="dot" style="background:'+areaColor(e.areaId)+'"></i></td>'+
+        '<td>'+esc(e.title)+(e.location?'<div class="dim" style="font-size:12px">'+esc(e.location)+"</div>":"")+"</td>"+
+        '<td class="num">'+(e.start?esc(e.start)+(e.end?"–"+esc(e.end):""):"todo el día")+"</td>"+
+        '<td class="act"><button class="iconbtn" data-act="evedit" data-tip="Editar">'+svg(I.pen)+"</button></td></tr>").join("")+
+      "</tbody></table></div>":"")+
+    '<div class="grouphead"><span class="eyebrow">Tareas</span><span class="chip">'+selTasks.length+"</span></div>"+
+    '<div class="panel-b flush tlist">'+(selTasks.length? selTasks.map(taskRow).join("")
+      : '<div class="empty">Sin tareas este día.</div>')+"</div>"+
+    (selCh.length?'<div class="grouphead"><span class="eyebrow">Movimientos</span></div><div class="panel-b flush">'+
+      '<table class="t"><tbody>'+selCh.map(c=>'<tr><td>'+esc(c.item.name)+'</td><td class="num" style="color:'+(c.kind==="in"?"var(--ok)":"var(--ink)")+'">'+
+      (c.kind==="in"?"+":"−")+fmtMoney(c.amount)+"</td></tr>").join("")+"</tbody></table></div>":"");
+}
+
+/* Cambia el dia marcado sin rehacer la vista: quita y pone la clase en las
+   celdas y reescribe solo el panel de la derecha. */
+function seleccionarDia(dstr){
+  UI.day = dstr;
+  const detalle = document.getElementById("agenda-detalle");
+  const celdas = document.querySelectorAll("#view [data-day]");
+  if(!detalle || !celdas.length) return false;
+  celdas.forEach(c=>c.classList.toggle("sel", c.getAttribute("data-day")===dstr));
+  detalle.innerHTML = agendaDetalle(dstr);
+  scrollTimelines();
+  writeUI();
+  return true;
 }
 function dayCellInner(dstr,inMonth){
   const d=parseYmd(dstr), ev=eventsForDate(dstr), tk=tasksForDate(dstr).filter(t=>!t.done);
@@ -1803,7 +1836,13 @@ document.addEventListener("click",e=>{
   const mf =t.closest("[data-mf]");  if(mf){ UI.moneyFilter=mf.getAttribute("data-mf"); render(); return; }
   const so =t.closest("[data-sort]");if(so){ UI.sort=so.getAttribute("data-sort"); render(); return; }
   const th =t.closest("[data-theme]");if(th){ S.settings.theme=th.getAttribute("data-theme"); applyTheme(); save(); return; }
-  const day=t.closest("[data-day]"); if(day){ UI.day=day.getAttribute("data-day"); UI.month=UI.day.slice(0,7); render(); return; }
+  const day=t.closest("[data-day]");
+  if(day){
+    const d=day.getAttribute("data-day");
+    const mismoMes = (d.slice(0,7)===UI.month);
+    if(UI.view==="agenda" && mismoMes && seleccionarDia(d)) return;   // sin rehacer la vista
+    UI.day=d; UI.month=d.slice(0,7); render(); return;
+  }
 
   const ics=t.closest("[data-ics]");
   if(ics){ ics.getAttribute("data-ics")==="imp"? importICS() : exportICS(); return; }
