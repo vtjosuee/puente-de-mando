@@ -111,10 +111,12 @@ main{min-width:0;display:flex;flex-direction:column}
 .panel-b{padding:14px 16px}
 .panel-b.flush{padding:0}
 .grid{display:grid;gap:16px}
+.grid>*{min-width:0}
 .cols2{grid-template-columns:minmax(0,1.55fr) minmax(0,1fr)}
 .cols2e{grid-template-columns:repeat(2,minmax(0,1fr))}
 .cols3{grid-template-columns:repeat(3,minmax(0,1fr))}
 .cols4{grid-template-columns:repeat(4,minmax(0,1fr))}
+.panel{min-width:0}
 
 /* ============ CONTROLS ============ */
 .btn{display:inline-flex;align-items:center;gap:7px;border:1px solid var(--line2);background:var(--surface);color:var(--ink);padding:7px 12px;border-radius:var(--r);font-weight:600;font-size:13.5px;transition:background .12s,border-color .12s}
@@ -219,6 +221,19 @@ table.t tbody tr:hover{background:var(--surface2)}
 table.t .num{font-family:var(--f-mono);font-variant-numeric:tabular-nums;text-align:right;white-space:nowrap}
 table.t td.act{width:1%;white-space:nowrap}
 tr.paid td{opacity:.55}
+@media (max-width:880px){
+  table.t.cards thead{display:none}
+  table.t.cards tbody tr{display:grid;grid-template-columns:minmax(0,1fr) auto;
+    column-gap:10px;row-gap:3px;padding:11px 13px;border-bottom:1px solid var(--line)}
+  table.t.cards tbody tr:last-child{border-bottom:none}
+  table.t.cards td{display:block;padding:0;border:none;white-space:normal}
+  table.t.cards td.c-nom{grid-area:1/1;font-size:14.5px}
+  table.t.cards td.c-imp{grid-area:1/2;text-align:right;font-size:14.5px}
+  table.t.cards td.c-sobre{grid-area:2/1}
+  table.t.cards td.c-next{grid-area:2/2;text-align:right;font-size:12.5px}
+  table.t.cards td.c-act{grid-area:3/2;text-align:right;width:auto}
+  table.t.cards td.c-freq{grid-area:3/1;align-self:center}
+}
 
 /* ============ CHARTS ============ */
 .alloc{display:flex;height:30px;border-radius:2px;overflow:hidden;gap:2px;background:var(--surface2)}
@@ -232,7 +247,7 @@ tr.paid td{opacity:.55}
   background-image:repeating-linear-gradient(to top,var(--line) 0 1px,transparent 1px 25%);background-size:100% 100%}
 .gcol{flex:1;display:flex;flex-direction:column;align-items:center;gap:5px;height:100%;justify-content:flex-end;min-width:0}
 .gbars{display:flex;align-items:flex-end;gap:2px;width:100%;justify-content:center;flex:1}
-.gbar{width:44%;max-width:20px;min-height:2px;border-radius:3px 3px 0 0;transition:filter .1s}
+.gbar{width:44%;max-width:20px;border-radius:3px 3px 0 0;transition:filter .1s}
 .gbar:hover{filter:brightness(1.2)}
 .gcol .glbl{font-family:var(--f-mono);font-size:10px;color:var(--ink3);white-space:nowrap}
 .legend{display:flex;flex-wrap:wrap;gap:14px;margin-top:10px}
@@ -272,7 +287,7 @@ tr.paid td{opacity:.55}
 .toast.bad{background:var(--crit);color:var(--on-crit)}
 
 /* ============ RESPONSIVE ============ */
-@media (max-width:1080px){.cols2,.cols4{grid-template-columns:1fr}.cols3{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media (max-width:1080px){.cols2,.cols4{grid-template-columns:minmax(0,1fr)}.cols3{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media (max-width:880px){
   #app{grid-template-columns:1fr}
   .rail{position:fixed;bottom:0;left:0;right:0;top:auto;height:auto;flex-direction:row;border-right:none;border-top:1px solid var(--line);z-index:100;
@@ -284,11 +299,15 @@ tr.paid td{opacity:.55}
   .nav svg{width:19px;height:19px}
   .nav .badge{position:absolute;top:3px;right:calc(50% - 20px);margin:0}
   .topbar{padding:calc(7px + env(safe-area-inset-top,0px)) 12px 7px;gap:7px}
+  /* 16px justos: por debajo, iOS amplia la pagina al tocar el campo */
+  input[type=text],input[type=number],input[type=date],input[type=time],
+  input[type=month],input[type=password],select,textarea{font-size:16px}
+  .topbar input[type=date]{font-size:16px;padding:4px 6px}
   .topbar h1{font-size:15.5px}
   .topbar .btn{padding:5px 9px;font-size:12.5px}
   .topbar .btn.sm{padding:4px 8px;font-size:12px}
   .topbar .iconbtn{width:27px;height:27px}
-  .topbar input[type=date]{padding:4px 7px;font-size:12.5px}
+  .topbar input[type=date]{padding:3px 6px;font-size:16px}
   .topbar .seg button{padding:5px 9px;font-size:12px}
   .sync{padding:5px 7px}
   .sync.ok span{display:none}
@@ -299,7 +318,7 @@ tr.paid td{opacity:.55}
   .panel-b{padding:12px 13px}
   .tlwrap{max-height:290px}
   .viewwrap{padding:14px 14px calc(118px + env(safe-area-inset-bottom,0px))}
-  .cols2e,.cols3{grid-template-columns:1fr}
+  .cols2e,.cols3{grid-template-columns:minmax(0,1fr)}
   .cell{min-height:64px;padding:3px}
   .cell .n{font-size:11px}
   .ev{font-size:9.5px}
@@ -1162,7 +1181,7 @@ function viewDinero(){
   const nextOf=it=>{ const o=occurrences(it,todayStr(),ymd(addDays(new Date(),400))); return o[0]||null; };
   const freqTxt=it=>({mensual:"Mensual · día "+(it.dom||1),semanal:"Semanal · "+DOWL[+it.weekday||0],
     anual:"Anual · "+(it.date?fmtDate(it.date):""),una:"Una vez",cuotas:"Cuotas"}[it.freq]||it.freq);
-  const expTable = rows.length? '<div class="tblwrap"><table class="t"><thead><tr>'+
+  const expTable = rows.length? '<div class="tblwrap"><table class="t cards"><thead><tr>'+
     "<th>Concepto</th><th>Sobre</th><th>Frecuencia</th><th>Próximo</th><th class='num'>Importe</th><th></th></tr></thead><tbody>"+
     rows.map(it=>{
       const nx=nextOf(it), b=bucketById(it.bucketId);
@@ -1170,12 +1189,12 @@ function viewDinero(){
       const isPaidThis = (it.paid||[]).some(p=>p>=r[0]&&p<=r[1]);
       const occThis = occurrences(it,r[0],r[1]);
       return '<tr'+(isPaidThis&&occThis.length?' class="paid"':"")+' data-exp="'+esc(it.id)+'">'+
-        "<td><b>"+esc(it.name)+"</b>"+(rest!=null?'<div class="dim mono" style="font-size:11.5px">'+((+it.count||1)-rest)+"/"+(+it.count||1)+" cuotas · restan "+fmtMoney0(rest*(+it.amount||0))+"</div>":"")+"</td>"+
-        "<td>"+(b?'<span class="chip"><i class="dot" style="background:var('+b.color+')"></i>'+esc(b.name)+"</span>":'<span class="dim">—</span>')+"</td>"+
-        '<td class="dim" style="font-size:12.5px">'+esc(freqTxt(it))+"</td>"+
-        '<td class="num'+(nx&&nx<=ymd(addDays(new Date(),7))?'" style="color:var(--warn)"':'"')+'>'+(nx?esc(fmtDate(nx)):'<span class="dim">—</span>')+"</td>"+
-        '<td class="num"><b>'+fmtMoney(it.amount)+"</b></td>"+
-        '<td class="act">'+(occThis.length?'<button class="iconbtn" data-act="paytoggle" data-d="'+occThis[0]+'" data-tip="'+(isPaidThis?"Marcar como no pagado":"Marcar como pagado")+'" style="'+(isPaidThis?"color:var(--ok)":"")+'">'+svg(I.check)+"</button>":"")+
+        '<td class="c-nom"><b>'+esc(it.name)+"</b>"+(rest!=null?'<div class="dim mono" style="font-size:11.5px">'+((+it.count||1)-rest)+"/"+(+it.count||1)+" cuotas · restan "+fmtMoney0(rest*(+it.amount||0))+"</div>":"")+"</td>"+
+        '<td class="c-sobre">'+(b?'<span class="chip"><i class="dot" style="background:var('+b.color+')"></i>'+esc(b.name)+"</span>":'<span class="dim">—</span>')+"</td>"+
+        '<td class="dim c-freq" style="font-size:12.5px">'+esc(freqTxt(it))+"</td>"+
+        '<td class="num c-next'+(nx&&nx<=ymd(addDays(new Date(),7))?'" style="color:var(--warn)"':'"')+'>'+(nx?esc(fmtDate(nx)):'<span class="dim">—</span>')+"</td>"+
+        '<td class="num c-imp"><b>'+fmtMoney(it.amount)+"</b></td>"+
+        '<td class="act c-act">'+(occThis.length?'<button class="iconbtn" data-act="paytoggle" data-d="'+occThis[0]+'" data-tip="'+(isPaidThis?"Marcar como no pagado":"Marcar como pagado")+'" style="'+(isPaidThis?"color:var(--ok)":"")+'">'+svg(I.check)+"</button>":"")+
         '<button class="iconbtn" data-act="expedit" data-tip="Editar">'+svg(I.pen)+"</button></td></tr>";
     }).join("")+"</tbody></table></div>"
     : '<div class="empty"><b>Sin gastos registrados</b>Añade tus suscripciones, recibos fijos y deudas puntuales.</div>';
@@ -1273,7 +1292,9 @@ function viewBalance(){
 
   /* cumplimiento por día/mes */
   let compChart;
-  if(rng==="ano"){
+  if(vTotal===0){
+    compChart = '<div class="empty"><b>Nada planificado en este periodo</b>Las tareas que apuntes en «Hoy» aparecerán aquí.</div>';
+  } else if(rng==="ano"){
     const perMonth=[]; for(let i=0;i<12;i++){
       const ms=from.slice(0,4)+"-"+pad(i+1);
       const r2=monthRange(ms);
@@ -1283,8 +1304,9 @@ function viewBalance(){
     const mx=Math.max(1,...perMonth.map(p=>p.total));
     compChart='<div class="gchart">'+perMonth.map(p=>
       '<div class="gcol"><div class="gbars" data-tip="<b>'+p.l+"</b><span class='tv'>"+p.done+" de "+p.total+" completadas</span>\">"+
-      '<div class="gbar" style="height:'+(p.total/mx*100)+'%;background:var(--surface3)"></div>'+
-      '<div class="gbar" style="height:'+(p.done/mx*100)+'%;background:var(--ok)"></div></div>'+
+      (p.total? '<div class="gbar" style="height:'+Math.max(3,p.total/mx*100)+'%;background:var(--surface3)"></div>':"")+
+      (p.done? '<div class="gbar" style="height:'+Math.max(3,p.done/mx*100)+'%;background:var(--ok)"></div>':"")+
+      "</div>"+
       '<div class="glbl">'+p.l+"</div></div>").join("")+"</div>"+
       '<div class="legend"><span><i style="background:var(--surface3)"></i>Planificadas</span><span><i style="background:var(--ok)"></i>Completadas</span></div>';
   } else {
@@ -1292,8 +1314,9 @@ function viewBalance(){
     compChart='<div class="gchart">'+perDay.map(p=>{
       const d=parseYmd(p.d);
       return '<div class="gcol"><div class="gbars" data-tip="<b>'+esc(fmtDate(p.d))+"</b><span class='tv'>"+p.done+" de "+p.total+" completadas</span>\">"+
-      '<div class="gbar" style="height:'+(p.total/mx*100)+'%;background:var(--surface3)"></div>'+
-      '<div class="gbar" style="height:'+(p.done/mx*100)+'%;background:var(--ok)"></div></div>'+
+      (p.total? '<div class="gbar" style="height:'+Math.max(3,p.total/mx*100)+'%;background:var(--surface3)"></div>':"")+
+      (p.done? '<div class="gbar" style="height:'+Math.max(3,p.done/mx*100)+'%;background:var(--ok)"></div>':"")+
+      "</div>"+
       '<div class="glbl">'+(rng==="semana"?DOW[isoDow(d)]:(d.getDate()%5===0||d.getDate()===1?d.getDate():""))+"</div></div>";
     }).join("")+"</div>"+
     '<div class="legend"><span><i style="background:var(--surface3)"></i>Planificadas</span><span><i style="background:var(--ok)"></i>Completadas</span></div>';
@@ -1313,10 +1336,13 @@ function viewBalance(){
   const yy=(rng==="ano")?from.slice(0,4):UI.month.slice(0,4);
   const mData=[]; for(let i=0;i<12;i++){ const t=monthTotals(yy+"-"+pad(i+1)); mData.push({l:MONS[i],inc:t.inc,exp:t.exp}); }
   const mxM=Math.max(1,...mData.map(d=>Math.max(d.inc,d.exp)));
-  const moneyChart='<div class="gchart">'+mData.map(d=>
+  const hayDinero = mData.some(d=>d.inc>0||d.exp>0);
+  const moneyChart= !hayDinero
+    ? '<div class="empty"><b>Sin movimientos en '+yy+'</b>Añade tu nómina y tus gastos fijos en «Dinero».</div>'
+    : '<div class="gchart">'+mData.map(d=>
     '<div class="gcol"><div class="gbars">'+
-      '<div class="gbar" data-tip="<b>'+d.l+" · ingresos</b><span class='tv'>"+fmtMoney(d.inc)+'</span>" style="height:'+(d.inc/mxM*100)+'%;background:var(--c8)"></div>'+
-      '<div class="gbar" data-tip="<b>'+d.l+" · gastos</b><span class='tv'>"+fmtMoney(d.exp)+'</span>" style="height:'+(d.exp/mxM*100)+'%;background:var(--c4)"></div>'+
+      (d.inc? '<div class="gbar" data-tip="<b>'+d.l+" · ingresos</b><span class='tv'>"+fmtMoney(d.inc)+'</span>" style="height:'+Math.max(3,d.inc/mxM*100)+'%;background:var(--c8)"></div>':"")+
+      (d.exp? '<div class="gbar" data-tip="<b>'+d.l+" · gastos</b><span class='tv'>"+fmtMoney(d.exp)+'</span>" style="height:'+Math.max(3,d.exp/mxM*100)+'%;background:var(--c4)"></div>':"")+
     '</div><div class="glbl">'+d.l+"</div></div>").join("")+"</div>"+
     '<div class="legend"><span><i style="background:var(--c8)"></i>Ingresos</span><span><i style="background:var(--c4)"></i>Gastos</span></div>';
 
