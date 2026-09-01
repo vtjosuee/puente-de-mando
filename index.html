@@ -190,8 +190,13 @@ label.fl > span{display:block;font-size:11px;font-weight:700;letter-spacing:.09e
 .tlhour{position:absolute;left:0;right:0;border-top:1px solid var(--line);font-family:var(--f-mono);font-size:10.5px;color:var(--ink3)}
 .tlhour span{position:absolute;left:0;top:-7px;width:38px;text-align:right}
 .tlhalf{position:absolute;left:46px;right:0;border-top:1px dashed color-mix(in srgb,var(--line) 65%,transparent)}
-.tlblock{position:absolute;left:50px;right:6px;border-radius:2px;padding:3px 7px;font-size:12px;font-weight:600;overflow:hidden;border-left:3px solid var(--c1);background:var(--surface2);color:var(--ink);cursor:pointer}
-.tlblock .t{font-family:var(--f-mono);font-size:10px;color:var(--ink3);font-weight:500}
+.tlblock{position:absolute;border-radius:2px;padding:3px 6px;font-size:12px;font-weight:600;overflow:hidden;
+  border:1px solid var(--line);border-left:3px solid var(--c1);
+  background:var(--surface2);color:var(--ink);cursor:pointer}
+.tlblock.corto{padding:0 6px;font-size:11px;line-height:1.5}
+.tlblock .tt{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.tlblock .t{font-family:var(--f-mono);font-size:10px;color:var(--ink3);font-weight:500;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .tlnow{position:absolute;left:38px;right:0;height:0;border-top:2px solid var(--accent);z-index:5}
 .tlnow::before{content:"";position:absolute;left:-4px;top:-4px;width:7px;height:7px;border-radius:50%;background:var(--accent)}
 .tlwrap{overflow-y:auto;overscroll-behavior:contain}
@@ -932,13 +937,52 @@ function renderTimeline(dstr, height){
     const s=minutesOf(t.time);
     blocks.push({s,e:s+Math.max(20,t.estMin||30),title:t.title,color:areaColor(t.areaId),kind:"task",id:t.id});
   });
-  blocks.sort((a,b)=>a.s-b.s);
-  blocks.forEach(b=>{
-    const top=((b.s-h0*60)/60)*H, hgt=Math.max(18,((b.e-b.s)/60)*H-2);
-    if(top+hgt<0 || top>total) return;
-    out += '<div class="tlblock" data-block="'+b.kind+':'+esc(b.id)+'" style="top:'+Math.max(0,top)+"px;height:"+hgt+"px;border-left-color:"+b.color+
-      ";background:color-mix(in srgb,"+b.color+" 12%,var(--surface))\">"+
-      '<div class="trunc">'+esc(b.title)+'</div><div class="t">'+hhmm(b.s)+"–"+hhmm(b.e)+"</div></div>";
+  // Alto y posicion de cada bloque. El minimo de 20px hace que dos tareas
+  // seguidas y cortas se pisen aunque no se solapen en el reloj, asi que el
+  // reparto se calcula sobre los pixeles que ocupan de verdad.
+  const MINH = 20;
+  const items = blocks.map(b=>{
+    const top = ((b.s - h0*60)/60)*H;
+    const h = Math.max(MINH, ((b.e - b.s)/60)*H - 2);
+    return { b, top, h, bot: top + h, col: 0, n: 1 };
+  }).sort((x,y)=> x.top - y.top || y.h - x.h);
+
+  // agrupar los que se tocan entre si
+  const grupos = [];
+  let grupo = [], finGrupo = -1e9;
+  items.forEach(it=>{
+    if(grupo.length && it.top >= finGrupo - 0.5){ grupos.push(grupo); grupo = []; finGrupo = -1e9; }
+    grupo.push(it);
+    finGrupo = Math.max(finGrupo, it.bot);
+  });
+  if(grupo.length) grupos.push(grupo);
+
+  // dentro de cada grupo, cada bloque va a la primera columna que quede libre
+  grupos.forEach(g=>{
+    const finCol = [];
+    g.forEach(it=>{
+      let c = 0;
+      while(c < finCol.length && finCol[c] > it.top + 0.5) c++;
+      it.col = c; finCol[c] = it.bot;
+    });
+    g.forEach(it=> it.n = finCol.length);
+  });
+
+  items.forEach(it=>{
+    const b = it.b;
+    if(it.bot < 0 || it.top > total) return;
+    const fx = (it.col / it.n).toFixed(4), fw = (1 / it.n).toFixed(4);
+    const corto = it.h < 34 || it.n >= 3;   // sin sitio para la linea de la hora
+    out += '<div class="tlblock'+(corto?" corto":"")+'" data-block="'+b.kind+':'+esc(b.id)+'"'+
+      ' data-tip="<b>'+esc(b.title)+"</b><span class='tv'>"+hhmm(b.s)+"–"+hhmm(b.e)+'</span>"'+
+      ' style="top:'+Math.max(0,it.top)+'px;height:'+it.h+'px'+
+      ';left:calc(50px + (100% - 56px) * '+fx+')'+
+      ';width:calc((100% - 56px) * '+fw+' - 3px)'+
+      ';border-left-color:'+b.color+
+      ';background:color-mix(in srgb,'+b.color+' 14%,var(--surface))">'+
+      '<div class="tt">'+esc(b.title)+"</div>"+
+      (corto? "" : '<div class="t">'+hhmm(b.s)+"–"+hhmm(b.e)+"</div>")+
+      "</div>";
   });
   const now=new Date();
   if(dstr===todayStr()){
