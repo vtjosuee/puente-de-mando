@@ -1455,15 +1455,17 @@ function viewAjustes(){
       (GH.user()?'<span class="chip"><i class="dot" style="background:var(--ok)"></i>@'+esc(GH.user())+"</span>":"")+"</div>"+
       '<div class="panel-b">'+
       (GH.token()
-        ? '<p class="muted" style="margin:0 0 12px;font-size:13.5px">Conectado a GitHub. Tus datos viajan en un <b>gist privado</b> de tu cuenta, así que los ves igual en el móvil y en el ordenador.</p>'+
+        ? '<p class="muted" style="margin:0 0 12px;font-size:13.5px">Conectado como <b>@'+esc(GH.user())+'</b>. Tus datos viajan en un almacén <b>privado de tu propia cuenta</b>: los ves igual en el móvil y en el ordenador, y <b>nadie más puede verlos</b>.</p>'+
           '<div class="wrap"><button class="btn" id="gh_now">'+svg(I.sync)+"Sincronizar ahora</button>"+
           '<button class="btn danger" id="gh_out">Desconectar</button></div>'+
-          '<div class="dim mono" style="font-size:11.5px;margin-top:10px">gist '+esc(GH.gist()||"—")+"</div>"
-        : '<p class="muted" style="margin:0 0 12px;font-size:13.5px">Ahora mismo tus datos solo están en este dispositivo. Conecta GitHub y se sincronizarán solos entre el móvil y el ordenador.</p>'+
+          '<div class="dim mono" style="font-size:11.5px;margin-top:10px">almacén '+esc(GH.gist()||"—")+"</div>"
+        : '<p class="muted" style="margin:0 0 6px;font-size:13.5px"><b>La app ya funciona así.</b> Lo que apuntes se guarda en este dispositivo y es solo tuyo.</p>'+
+          '<p class="muted" style="margin:0 0 12px;font-size:13.5px">Conecta una cuenta de GitHub si además quieres <b>verlo igual en el móvil y en el ordenador</b> y no perderlo si cambias de aparato. Cada persona usa su propia cuenta: nadie ve lo de nadie.</p>'+
           '<label class="fl"><span>Token de GitHub</span><input type="password" id="gh_tok" placeholder="ghp_…" autocomplete="off" spellcheck="false"></label>'+
           '<div class="wrap" style="margin-top:12px"><button class="btn pri" id="gh_in">Conectar</button>'+
-          '<a class="btn" target="_blank" rel="noopener" href="https://github.com/settings/tokens/new?scopes=gist&description=Puente%20de%20Mando">Crear el token</a></div>'+
-          '<p class="dim" style="font-size:12px;margin:12px 0 0">El botón te lleva a GitHub con el permiso correcto ya marcado (<b>gist</b>, nada más). Copia el token y pégalo aquí. Se queda guardado en este dispositivo y no se envía a ningún otro sitio.</p>')+
+          '<a class="btn" target="_blank" rel="noopener" href="https://github.com/settings/tokens/new?scopes=gist&description=Puente%20de%20Mando">Conseguir el token</a></div>'+
+          '<p class="dim" style="font-size:12px;margin:12px 0 0">El botón abre GitHub con el permiso justo ya marcado (<b>gist</b>, nada más: no puede tocar nada de tu cuenta). Si no tienes cuenta, te dejará crearla. Copia el código que te dé y pégalo aquí; se queda en este dispositivo y no se envía a ningún otro sitio.</p>'+
+          '<p class="dim" style="font-size:12px;margin:8px 0 0">Nunca uses el código de otra persona: verías sus datos en vez de los tuyos.</p>')+
     "</div></div>"+
 
     '<div class="panel"><div class="panel-h"><span class="eyebrow">Datos</span></div><div class="panel-b">'+
