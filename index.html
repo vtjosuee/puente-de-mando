@@ -1472,7 +1472,7 @@ function viewAjustes(){
       '<p class="muted" style="margin:0 0 12px;font-size:13.5px">Copia de seguridad manual, por si quieres guardarlos aparte o llevártelos a otro sitio.</p>'+
       '<div class="wrap">'+
         '<button class="btn" id="d_exp">'+svg(I.dl)+"Exportar copia (JSON)</button>"+
-        '<button class="btn" id="d_imp">'+svg(I.ul)+"Importar copia</button>"+
+        '<button class="btn" id="d_imp">'+svg(I.ul)+"Importar</button>"+
         '<button class="btn danger" id="d_wipe">'+svg(I.trash)+"Borrar todo</button>"+
       "</div>"+
       '<div class="dim mono" style="font-size:11.5px;margin-top:12px">Último cambio: '+esc(new Date(S.updatedAt).toLocaleString("es-ES"))+
@@ -1796,6 +1796,40 @@ function showText(filename,data){
 }
 function exportICS(){ offerFile("puente-de-mando.ics", buildICS()); }
 function exportJSON(){ offerFile("puente-de-mando-"+todayStr()+".json", JSON.stringify(S,null,2)); }
+/* Suma lo que traiga el archivo sin tocar lo que ya hay.
+   Lo que comparta identificador se respeta: nunca se pisa nada. */
+function mergeState(o){
+  const cuenta = {areas:0, tasks:0, routines:0, events:0, buckets:0, incomes:0, expenses:0};
+  const sumar = (destino, origen, clave) => {
+    if(!Array.isArray(destino) || !Array.isArray(origen)) return;
+    const vistos = {};
+    destino.forEach(x => { if(x && x.id) vistos[x.id] = 1; });
+    origen.forEach(x => {
+      if(!x || !x.id || vistos[x.id]) return;
+      destino.push(x); vistos[x.id] = 1; cuenta[clave]++;
+    });
+  };
+  sumar(S.areas, o.areas, "areas");
+  sumar(S.tasks, o.tasks, "tasks");
+  sumar(S.routines, o.routines, "routines");
+  sumar(S.events, o.events, "events");
+  const m = o.money || {};
+  sumar(S.money.buckets, m.buckets, "buckets");
+  sumar(S.money.incomes, m.incomes, "incomes");
+  sumar(S.money.expenses, m.expenses, "expenses");
+  return cuenta;
+}
+function resumenArchivo(o){
+  const m = o.money || {};
+  const partes = [
+    [(o.tasks||[]).length, "tarea", "tareas"],
+    [(o.events||[]).length, "evento", "eventos"],
+    [(o.routines||[]).length, "rutina", "rutinas"],
+    [(o.areas||[]).length, "área", "áreas"],
+    [((m.incomes||[]).length + (m.expenses||[]).length), "movimiento", "movimientos"]
+  ].filter(x => x[0] > 0).map(x => x[0] + " " + (x[0] === 1 ? x[1] : x[2]));
+  return partes.length ? partes.join(", ") : "nada reconocible";
+}
 function importJSON(){
   const inp=document.createElement("input"); inp.type="file"; inp.accept=".json,application/json";
   inp.addEventListener("change",()=>{
@@ -1803,9 +1837,30 @@ function importJSON(){
     const rd=new FileReader();
     rd.onload=()=>{
       let o; try{ o=JSON.parse(rd.result); }catch(e){ toast("El archivo no es un JSON válido.",true); return; }
-      confirmBox("Importar copia","Se reemplazan todos los datos actuales por los del archivo.",()=>{
-        S=migrate(o); save(); toast("Copia importada.");
-      },"Reemplazar");
+      const mio = (S.tasks||[]).length + (S.events||[]).length +
+                  ((S.money.incomes||[]).length + (S.money.expenses||[]).length);
+      const m = openModal("Importar",
+        '<p style="margin:0 0 10px;font-size:13.5px">El archivo trae <b>'+esc(resumenArchivo(o))+"</b>.</p>"+
+        '<p class="muted" style="margin:0 0 6px;font-size:13.5px"><b>Añadir</b> lo suma a lo que ya tienes'+
+          (mio? " ("+mio+" cosas apuntadas)":"")+" y no borra nada.</p>"+
+        '<p class="dim" style="margin:0;font-size:12.5px"><b>Reemplazar</b> tira todo lo actual y deja solo el archivo. Solo si estás restaurando una copia de seguridad.</p>',
+        '<button class="btn" data-c4 type="button">Cancelar</button>'+
+        '<button class="btn danger" data-repl type="button">Reemplazar todo</button>'+
+        '<button class="btn pri" data-merge type="button">Añadir</button>');
+      $("[data-c4]",m).addEventListener("click",closeModal);
+      $("[data-merge]",m).addEventListener("click",()=>{
+        closeModal();
+        const c = mergeState(migrate(o));
+        const total = Object.keys(c).reduce((a,k)=>a+c[k],0);
+        save();
+        toast(total? "Añadido: "+c.tasks+" tareas, "+c.events+" eventos." : "Ya lo tenías todo.");
+      });
+      $("[data-repl]",m).addEventListener("click",()=>{
+        closeModal();
+        confirmBox("Reemplazar todo","Se borra lo que tienes ahora y queda solo el contenido del archivo.",()=>{
+          S=migrate(o); save(); toast("Copia restaurada.");
+        },"Reemplazar");
+      });
     };
     rd.readAsText(f);
   });
